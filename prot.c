@@ -1077,6 +1077,123 @@ read_duration(int64 *duration, const char *buf, char **end)
     return 0;
 }
 
+// Function to compute 10^n
+double my_pow10(int n) {
+    double ret = 1.0;
+    double r = 10.0;
+    if (n < 0) {
+        n = -n;
+        r = 0.1;
+    }
+
+    while (n) {
+        if (n & 1) {
+            ret *= r;
+        }
+        r *= r;
+        n >>= 1;
+    }
+    return ret;
+}
+
+// Function to parse a double value from a string
+static double crack_atof(const char *num, const char **end) {
+    const char *ptr = num;
+    int sign = 1;
+    double int_part = 0.0;
+    double frac_part = 0.0;
+
+    // Skip leading spaces
+    while (*ptr == ' ') {
+        ptr++;
+    }
+
+    // Handle sign
+    if (*ptr == '-') {
+        sign = -1;
+        ptr++;
+    } else if (*ptr == '+') {
+        ptr++;
+    }
+
+    // Parse integer part
+    while (*ptr >= '0' && *ptr <= '9') {
+        int_part = int_part * 10 + (*ptr - '0');
+        ptr++;
+    }
+
+    // Parse fractional part
+    if (*ptr == '.') {
+        ptr++;
+        double frac_exp = 0.1;
+        while (*ptr >= '0' && *ptr <= '9') {
+            frac_part += frac_exp * (*ptr - '0');
+            frac_exp *= 0.1;
+            ptr++;
+        }
+    }
+
+    // Parse exponent part
+    double exp_part = 1.0;
+    if (*ptr == 'e' || *ptr == 'E') {
+        ptr++;
+        int exp_sign = 1;
+        if (*ptr == '-') {
+            exp_sign = -1;
+            ptr++;
+        } else if (*ptr == '+') {
+            ptr++;
+        }
+        int exp_val = 0;
+        while (*ptr >= '0' && *ptr <= '9') {
+            exp_val = exp_val * 10 + (*ptr - '0');
+            ptr++;
+        }
+        exp_part = my_pow10(exp_sign * exp_val);
+    }
+
+    // Update end pointer
+    if (end) {
+        *end = ptr;
+    }
+
+    return sign * (int_part + frac_part) * exp_part;
+}
+
+/* Read a delay value in seconds (allows to receive a float for sub-second resolution) 
+   from the given buffer and place it in duration in nanoseconds.
+   The interface and behavior are analogous to read_u32(). */
+static int
+read_duration_double(int64 *duration, const char *buf, char **end)
+{
+    if (!buf || !duration) {
+        return -1;
+    }
+    
+    const char *tend = NULL;
+
+    // Parse double using the modified crack_atof
+    double seconds = crack_atof(buf, &tend);
+
+    // Ensure at least one valid character was parsed
+    if (tend == buf) {
+        return -1;
+    }
+
+    // Update end pointer
+    if (end) {
+        *end = (char *)tend;
+    }
+
+    // Convert seconds to nanoseconds
+    if (seconds < 0 || seconds > INT64_MAX / 1000000000.0) {
+        return -1;
+    }
+    *duration = (int64_t)(seconds * 1000000000.0);    
+
+    return 0;
+}
+
 /* Read a tube name from the given buffer moving the buffer to the name start */
 static int
 read_tube_name(char **tubename, char *buf, char **end)
@@ -1315,7 +1432,7 @@ dispatch_cmd(Conn *c)
     switch (type) {
     case OP_PUT:
         if (read_u32(&pri, c->cmd + 4, &delay_buf) ||
-            read_duration(&delay, delay_buf, &ttr_buf) ||
+            read_duration_double(&delay, delay_buf, &ttr_buf) ||
             read_duration(&ttr, ttr_buf, &size_buf) ||
             read_u32(&body_size, size_buf, &end_buf)) {
             reply_msg(c, MSG_BAD_FORMAT);
@@ -1545,7 +1662,7 @@ dispatch_cmd(Conn *c)
     case OP_RELEASE:
         if (read_u64(&id, c->cmd + CMD_RELEASE_LEN, &pri_buf) ||
             read_u32(&pri, pri_buf, &delay_buf) ||
-            read_duration(&delay, delay_buf, NULL)) {
+            read_duration_double(&delay, delay_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
         }
@@ -1814,7 +1931,7 @@ dispatch_cmd(Conn *c)
 
     case OP_PAUSE_TUBE:
         if (read_tube_name(&name, c->cmd + CMD_PAUSE_TUBE_LEN, &delay_buf) ||
-            read_duration(&delay, delay_buf, NULL)) {
+            read_duration_double(&delay, delay_buf, NULL)) {
             reply_msg(c, MSG_BAD_FORMAT);
             return;
         }
