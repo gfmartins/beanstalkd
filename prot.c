@@ -1078,7 +1078,7 @@ read_duration(int64 *duration, const char *buf, char **end)
 }
 
 // Function to compute 10^n
-double my_pow10(int n) {
+double atof_pow10(int n) {
     double ret = 1.0;
     double r = 10.0;
     if (n < 0) {
@@ -1149,7 +1149,7 @@ static double crack_atof(const char *num, const char **end) {
             exp_val = exp_val * 10 + (*ptr - '0');
             ptr++;
         }
-        exp_part = my_pow10(exp_sign * exp_val);
+        exp_part = atof_pow10(exp_sign * exp_val);
     }
 
     // Update end pointer
