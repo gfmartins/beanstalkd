@@ -3,7 +3,7 @@
 
 # beanstalkd
 
-Simple and fast general purpose work queue. 
+Simple and fast general purpose work queue.
 
 https://beanstalkd.github.io/
 
