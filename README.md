@@ -6,7 +6,7 @@
 Simple and fast general purpose work queue. 
 
 ***This version allows for sub-second delay resolution - you may need to change the client library that you are using to pass the delay as a float. eg: 1.456 seconds***
-***Alert: Performance hits are not measured.***
+***Alert: Performance hits are not measured. It should be fast***
 
 https://beanstalkd.github.io/
 
